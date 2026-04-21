@@ -8,14 +8,10 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from cost import cost_for, total_tokens
+from cost import cost_for, total_tokens, resolve_projects_dir
 
 CACHE_TTL_SEC = 10
 CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
-STORES = [
-    os.path.expanduser("~/.claude/projects"),
-    os.path.expanduser("~/.claude-pessoal/projects"),
-]
 
 
 def load_coef():
@@ -40,50 +36,50 @@ def current_branch(cwd=None):
     return None
 
 
-def aggregate(cwd, branch):
+def aggregate(cwd, branch, projects_dir=None):
     cost = 0.0
     tokens = 0
     seen = set()
     encoded = cwd.replace("/", "-")
-    for store in STORES:
-        base = os.path.join(store, encoded)
-        if not os.path.isdir(base):
+    store = projects_dir or resolve_projects_dir()
+    base = os.path.join(store, encoded)
+    if not os.path.isdir(base):
+        return cost, tokens
+    try:
+        entries = os.listdir(base)
+    except OSError:
+        return cost, tokens
+    for name in entries:
+        if not name.endswith(".jsonl"):
             continue
+        fp = os.path.join(base, name)
         try:
-            entries = os.listdir(base)
+            with open(fp, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        obj = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    if obj.get("cwd") != cwd:
+                        continue
+                    if obj.get("gitBranch") != branch:
+                        continue
+                    msg = obj.get("message") or {}
+                    usage = msg.get("usage")
+                    if not isinstance(usage, dict):
+                        continue
+                    mid = msg.get("id")
+                    key = (mid, fp)
+                    if mid and key in seen:
+                        continue
+                    seen.add(key)
+                    cost += cost_for(msg.get("model", ""), usage)
+                    tokens += total_tokens(usage)
         except OSError:
             continue
-        for name in entries:
-            if not name.endswith(".jsonl"):
-                continue
-            fp = os.path.join(base, name)
-            try:
-                with open(fp, "r", encoding="utf-8") as f:
-                    for line in f:
-                        line = line.strip()
-                        if not line:
-                            continue
-                        try:
-                            obj = json.loads(line)
-                        except json.JSONDecodeError:
-                            continue
-                        if obj.get("cwd") != cwd:
-                            continue
-                        if obj.get("gitBranch") != branch:
-                            continue
-                        msg = obj.get("message") or {}
-                        usage = msg.get("usage")
-                        if not isinstance(usage, dict):
-                            continue
-                        mid = msg.get("id")
-                        key = (mid, fp)
-                        if mid and key in seen:
-                            continue
-                        seen.add(key)
-                        cost += cost_for(msg.get("model", ""), usage)
-                        tokens += total_tokens(usage)
-            except OSError:
-                continue
     return cost, tokens
 
 

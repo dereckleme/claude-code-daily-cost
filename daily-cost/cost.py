@@ -84,13 +84,32 @@ def business_days(days: int, today=None):
     return ordered
 
 
-def scan(allowed_days):
+def resolve_projects_dir(stdin_ctx=None):
+    """Resolve the Claude Code projects dir for the current session.
+
+    Priority: transcript_path from stdin (statusline) → CLAUDE_CONFIG_DIR env →
+    default ~/.claude/projects. Lets the skill coexist with ~/.claude-pessoal
+    and follow whichever config the running session is actually using.
+    """
+    if stdin_ctx:
+        tp = stdin_ctx.get("transcript_path")
+        if tp:
+            return os.path.dirname(os.path.dirname(tp))
+    env = os.environ.get("CLAUDE_CONFIG_DIR")
+    if env:
+        return os.path.join(os.path.expanduser(env), "projects")
+    return os.path.expanduser("~/.claude/projects")
+
+
+def scan(allowed_days, projects_dir=None):
     """Scan Claude Code JSONLs once; return per-day aggregates and per-minute tokens."""
     allowed = set(allowed_days)
     seen_ids = set()
     daily = defaultdict(lambda: {"cost": 0.0, "tokens": 0, "msgs": 0})
     minutes = defaultdict(int)
-    pattern = os.path.expanduser("~/.claude/projects/**/*.jsonl")
+    if projects_dir is None:
+        projects_dir = resolve_projects_dir()
+    pattern = os.path.join(projects_dir, "**/*.jsonl")
     for fp in glob.glob(pattern, recursive=True):
         try:
             with open(fp, "r", encoding="utf-8") as f:

@@ -8,7 +8,7 @@ import sys
 from datetime import datetime, timedelta
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from cost import scan, business_days
+from cost import scan, business_days, resolve_projects_dir
 from by_branch import aggregate as aggregate_branch, current_branch, fmt_tokens
 
 stdin_ctx = {}
@@ -125,7 +125,8 @@ while cursor <= prev_month_end:
     days_set.add(cursor)
     cursor += timedelta(days=1)
 
-scanned = scan(days_set)
+projects_dir = resolve_projects_dir(stdin_ctx)
+scanned = scan(days_set, projects_dir=projects_dir)
 daily = scanned["daily"]
 minutes = scanned["minutes"]
 today_cost = daily[today]["cost"] * COEF
@@ -157,7 +158,7 @@ if SEG.get("branch"):
     branch_cwd = ws.get("current_dir") or stdin_ctx.get("cwd") or os.getcwd()
     branch_name = current_branch(cwd=branch_cwd)
     if branch_name:
-        bcost_raw, btokens = aggregate_branch(branch_cwd, branch_name)
+        bcost_raw, btokens = aggregate_branch(branch_cwd, branch_name, projects_dir=projects_dir)
         bcost = bcost_raw * COEF
 
 
