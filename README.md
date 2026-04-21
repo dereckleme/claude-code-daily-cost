@@ -1,20 +1,63 @@
 # claude-code-daily-cost
 
-Skills para acompanhar o gasto do [Claude Code](https://claude.com/claude-code) direto no terminal.
+Skills para acompanhar o gasto do [Claude Code](https://claude.com/claude-code) no terminal, com **métricas inline direto na statusline** (hoje, semana, mês, sobra, reset, branch) e comando dedicado para ver o histórico em tabela.
 
-Mostra quanto você gastou hoje, nos últimos N dias úteis e no mês (vs. limite configurado), com gráfico de barras ASCII. Inclui também toggles para exibir métricas inline na statusline.
+## Principais comandos
 
-## Skills incluídas
+### `/daily-cost-enable-metrics-inline`
 
-| Skill | Comando | O que faz |
-|-------|---------|-----------|
-| `daily-cost` | `/daily-cost [dias]` | Tabela com gasto de hoje, últimos N dias úteis e mês vs. limite |
-| `daily-cost-enable-metrics-inline` | `/daily-cost-enable-metrics-inline` | Liga métricas na statusline (today, week, month, remaining, reset) |
-| `daily-cost-disable-metrics-inline` | `/daily-cost-disable-metrics-inline` | Desliga as métricas inline |
+Liga as métricas da statusline do Claude Code editando `~/.claude/skills/daily-cost/config.json`. A partir daí, o custo aparece **em tempo real** enquanto você trabalha — sem precisar rodar nenhum comando.
+
+```
+/daily-cost-enable-metrics-inline              # liga tudo
+/daily-cost-enable-metrics-inline today month  # só hoje e mês
+/daily-cost-enable-metrics-inline hoje sobra   # aceita PT também
+```
+
+Segmentos disponíveis:
+
+| Segmento | O que mostra |
+|----------|--------------|
+| `today` | `hoje $X` |
+| `week` | `Nd úteis $X` |
+| `month` | `mês $X/$LIMIT` |
+| `remaining` | `sobra $X` dentro dos parênteses do mês |
+| `reset` | data de reset dentro dos parênteses do mês |
+| `branch` | `branch <nome> Xk tok · $X` (branch git do cwd + custo) |
+
+### `/daily-cost-disable-metrics-inline`
+
+Desliga segmentos da statusline. Mesma sintaxe — sem argumentos desliga todos, ou passe os nomes pra desligar seletivamente.
+
+```
+/daily-cost-disable-metrics-inline             # desliga tudo
+/daily-cost-disable-metrics-inline branch      # só esconde o segmento da branch
+```
+
+### `/daily-cost` (histórico em tabela)
+
+Mostra gasto dos últimos N dias úteis + mês vs. limite, com gráfico ASCII.
+
+```
+/daily-cost        # últimos 5 dias úteis
+/daily-cost 10     # últimos 10 dias úteis
+```
+
+Exemplo de saída:
+
+```
+  Claude Code — últimos 5 dias úteis  (custo em USD, tokens totais)
+  ────────────────────────────────────────────────────────────────
+  2026-04-15 Qua  $ 97.94  ████████████████████████████   36.56M tok  (733 msg)
+  2026-04-16 Qui  $ 38.22  ███████████░░░░░░░░░░░░░░░░░   30.68M tok  (587 msg)
+  2026-04-17 Sex  $ 12.66  ████░░░░░░░░░░░░░░░░░░░░░░░░   27.31M tok  (483 msg)
+  2026-04-20 Seg  $ 41.10  ████████████░░░░░░░░░░░░░░░░   20.34M tok  (400 msg)
+  2026-04-21 Ter  $ 65.76  ███████████████████░░░░░░░░░   19.60M tok  (316 msg)
+  ────────────────────────────────────────────────────────────────
+  TOTAL                     $255.68                                134.49M tok
+```
 
 ## Instalação
-
-Copie cada pasta de skill para `~/.claude/skills/`:
 
 ```bash
 git clone git@github.com:dereckleme/claude-code-daily-cost.git
@@ -23,11 +66,22 @@ cp -r claude-code-daily-cost/daily-cost-enable-metrics-inline ~/.claude/skills/
 cp -r claude-code-daily-cost/daily-cost-disable-metrics-inline ~/.claude/skills/
 ```
 
-Reinicie o Claude Code e os comandos `/daily-cost`, `/daily-cost-enable-metrics-inline` e `/daily-cost-disable-metrics-inline` estarão disponíveis.
+Pra statusline consumir o script inline, aponte `statusLine` no `~/.claude/settings.json`:
+
+```json
+{
+  "statusLine": {
+    "type": "command",
+    "command": "python3 ~/.claude/skills/daily-cost/statusline.py"
+  }
+}
+```
+
+Reinicie o Claude Code. Depois rode `/daily-cost-enable-metrics-inline` e a statusline passa a mostrar o custo.
 
 ## Configuração
 
-Edite `~/.claude/skills/daily-cost/config.json`:
+`~/.claude/skills/daily-cost/config.json`:
 
 ```json
 {
@@ -46,17 +100,18 @@ Edite `~/.claude/skills/daily-cost/config.json`:
 }
 ```
 
-- `monthly_limit` — seu teto mensal em USD
-- `plan_coefficient` — fator aplicado ao custo bruto (use `1.0` se pagar preço cheio da API)
-- `business_days` — padrão de dias úteis usado quando o comando é chamado sem argumento
-- `segments` — quais métricas aparecem na statusline quando habilitadas
+- `segments` — o que aparece na statusline (controlado pelas skills `enable`/`disable-metrics-inline`)
+- `monthly_limit` — teto mensal em USD
+- `plan_coefficient` — fator aplicado ao custo bruto (use `1.0` se você paga preço cheio da API)
+- `business_days` — padrão quando `/daily-cost` é chamado sem argumento
 
-## Uso
+## Skills incluídas
 
-```bash
-/daily-cost        # últimos 5 dias úteis + mês
-/daily-cost 10     # últimos 10 dias úteis
-```
+| Skill | Comando | O que faz |
+|-------|---------|-----------|
+| `daily-cost-enable-metrics-inline` | `/daily-cost-enable-metrics-inline` | **Liga** métricas na statusline |
+| `daily-cost-disable-metrics-inline` | `/daily-cost-disable-metrics-inline` | **Desliga** métricas na statusline |
+| `daily-cost` | `/daily-cost [dias]` | Tabela com histórico de gasto |
 
 ## Requisitos
 
