@@ -230,7 +230,7 @@ def daily_chart(daily_dict, ref_date, coef):
     total_levels = LEVELS_PER_ROW * 3
     empty_top = c(DEEP_GRAY, "   ")
     empty_mid = c(DEEP_GRAY, "   ")
-    empty_bot = c(DEEP_GRAY, "───")
+    empty_bot = c(DEEP_GRAY, "___")
     rows = [[], [], []]
     day_colors = []
     for v in cols:
