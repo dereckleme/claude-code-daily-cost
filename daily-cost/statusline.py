@@ -23,7 +23,7 @@ DEFAULTS = {
         "remaining": True, "reset": True, "branch": True,
         "tpm": True, "tpm_chart": True,
     },
-    "monthly_limit": 300.00,
+    "monthly_limit": 100.00,
     "plan_coefficient": 0.4419,
     "business_days": 5,
     "trend_tolerance_pct": 10.0,

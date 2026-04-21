@@ -10,6 +10,8 @@ Skills para acompanhar o gasto do [Claude Code](https://claude.com/claude-code) 
 
 Liga as métricas da statusline do Claude Code editando `~/.claude/skills/daily-cost/config.json`. A partir daí, o custo aparece **em tempo real** enquanto você trabalha — sem precisar rodar nenhum comando.
 
+Na **primeira ativação**, a skill pergunta qual é a sua **cota mensal em USD** (default shipado é `100.00`, placeholder) e grava em `monthly_limit`. Nas próximas execuções, respeita o valor já configurado e não pergunta de novo.
+
 ```
 /daily-cost-enable-metrics-inline              # liga tudo
 /daily-cost-enable-metrics-inline today month  # só hoje e mês
@@ -96,14 +98,14 @@ Reinicie o Claude Code. Depois rode `/daily-cost-enable-metrics-inline` e a stat
     "branch": true,
     "tpm_chart": true
   },
-  "monthly_limit": 300.00,
+  "monthly_limit": 100.00,
   "plan_coefficient": 0.4419,
   "business_days": 5
 }
 ```
 
 - `segments` — o que aparece na statusline (controlado pelas skills `enable`/`disable-metrics-inline`)
-- `monthly_limit` — teto mensal em USD
+- `monthly_limit` — teto mensal em USD (default shipado é `100.00`; a skill `enable-metrics-inline` te pergunta o valor real na primeira ativação)
 - `plan_coefficient` — fator aplicado ao custo bruto (use `1.0` se você paga preço cheio da API)
 - `business_days` — padrão quando `/daily-cost` é chamado sem argumento
 
