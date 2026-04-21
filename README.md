@@ -2,6 +2,8 @@
 
 Skills para acompanhar o gasto do [Claude Code](https://claude.com/claude-code) no terminal, com **métricas inline direto na statusline** (hoje, semana, mês, sobra, reset, branch) e comando dedicado para ver o histórico em tabela.
 
+![Statusline do Claude Code com métricas inline ativas](docs/statusline-inline.png)
+
 ## Principais comandos
 
 ### `/daily-cost-enable-metrics-inline`
@@ -33,12 +35,6 @@ Desliga segmentos da statusline. Mesma sintaxe — sem argumentos desliga todos,
 /daily-cost-disable-metrics-inline             # desliga tudo
 /daily-cost-disable-metrics-inline branch      # só esconde o segmento da branch
 ```
-
-### Preview
-
-Exemplo da statusline com todos os segmentos ligados (mês, sobra, reset, dias úteis, hoje, branch + gráfico mensal e TPM):
-
-![Statusline do Claude Code com métricas inline ativas](docs/statusline-inline.png)
 
 ### `/daily-cost` (histórico em tabela)
 
