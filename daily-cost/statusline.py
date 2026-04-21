@@ -370,7 +370,7 @@ prefix = apply_bg(prefix_inner, PREFIX_BG)
 if parts:
     boxed = [apply_bg(text, bg_code) for text, bg_code in parts]
     print(f"{prefix}  {sep.join(boxed)}")
-else:
+elif SEG.get("tpm_chart"):
     print(prefix)
 
 if SEG.get("tpm_chart"):

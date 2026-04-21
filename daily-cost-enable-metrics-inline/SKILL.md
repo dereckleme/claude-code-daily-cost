@@ -1,6 +1,6 @@
 ---
 name: daily-cost-enable-metrics-inline
-description: Liga métricas do statusline do Claude Code (today, week, month, remaining, reset) editando ~/.claude/skills/daily-cost/config.json.
+description: Liga métricas do statusline do Claude Code (today, week, month, remaining, reset, branch, tpm, tpm_chart) editando ~/.claude/skills/daily-cost/config.json.
 ---
 
 Liga segmentos do statusline inline. Config em `~/.claude/skills/daily-cost/config.json`, bloco `segments`:
@@ -11,6 +11,8 @@ Liga segmentos do statusline inline. Config em `~/.claude/skills/daily-cost/conf
 - `remaining` — "sobra $X" dentro do parênteses do mês
 - `reset` — data de reset dentro do parênteses do mês
 - `branch` — "branch <nome> Xk tok · $X" (branch git do cwd + custo nessa branch)
+- `tpm` — "TPM atual/média" (aparece na linha do gráfico)
+- `tpm_chart` — gráfico mensal de barras + eixo de dias
 
 ## Passos
 
@@ -25,8 +27,8 @@ Liga segmentos do statusline inline. Config em `~/.claude/skills/daily-cost/conf
    Se `monthly_limit` já estiver customizado (diferente de 100), **não pergunte** — respeite o que está lá.
 
 3. Interprete o argumento do usuário pros segments:
-   - **Sem argumento** ou palavras como "tudo", "all": ligue **todos** os segments (`today`, `week`, `month`, `remaining`, `reset`, `branch` → `true`).
-   - **Com nomes** (separados por espaço/vírgula, em PT ou EN — ex.: `hoje`, `semana`/`week`, `mes`/`month`, `sobra`/`remaining`, `reset`, `branch`): ligue só os nomeados.
+   - **Sem argumento** ou palavras como "tudo", "all": ligue **todos** os segments (`today`, `week`, `month`, `remaining`, `reset`, `branch`, `tpm`, `tpm_chart` → `true`).
+   - **Com nomes** (separados por espaço/vírgula, em PT ou EN — ex.: `hoje`, `semana`/`week`, `mes`/`month`, `sobra`/`remaining`, `reset`, `branch`, `tpm`, `grafico`/`chart`/`tpm_chart`): ligue só os nomeados.
 
 4. Edite o arquivo com a Edit tool (troque `false` por `true` nos campos correspondentes e ajuste `monthly_limit` se o usuário informou).
 
