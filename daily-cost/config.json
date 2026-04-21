@@ -1,0 +1,14 @@
+{
+  "segments": {
+    "today": true,
+    "week": true,
+    "month": true,
+    "remaining": true,
+    "reset": true,
+    "branch": true,
+    "tpm_chart": true
+  },
+  "monthly_limit": 300.00,
+  "plan_coefficient": 0.4419,
+  "business_days": 5
+}
