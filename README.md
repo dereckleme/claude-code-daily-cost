@@ -34,6 +34,12 @@ Desliga segmentos da statusline. Mesma sintaxe — sem argumentos desliga todos,
 /daily-cost-disable-metrics-inline branch      # só esconde o segmento da branch
 ```
 
+### Preview
+
+Exemplo da statusline com todos os segmentos ligados (mês, sobra, reset, dias úteis, hoje, branch + gráfico mensal e TPM):
+
+![Statusline do Claude Code com métricas inline ativas](docs/statusline-inline.png)
+
 ### `/daily-cost` (histórico em tabela)
 
 Mostra gasto dos últimos N dias úteis + mês vs. limite, com gráfico ASCII.
