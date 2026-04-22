@@ -28,6 +28,7 @@ Segmentos disponíveis:
 | `remaining` | `sobra $X` dentro dos parênteses do mês |
 | `reset` | data de reset dentro dos parênteses do mês |
 | `branch` | `branch <nome> Xk tok · $X` (branch git do cwd + custo) |
+| `limit` | `LIMITE X% · RESET Yh` (cota 5h em tempo real — requer proxy, ver abaixo) |
 
 ### `/daily-cost-disable-metrics-inline`
 
@@ -36,6 +37,21 @@ Desliga segmentos da statusline. Mesma sintaxe — sem argumentos desliga todos,
 ```
 /daily-cost-disable-metrics-inline             # desliga tudo
 /daily-cost-disable-metrics-inline branch      # só esconde o segmento da branch
+```
+
+### `/daily-cost-enable-usage-proxy` — cota em tempo real
+
+Sobe um proxy HTTP local em `127.0.0.1:8765` que fica entre o Claude Code e `api.anthropic.com`, captura os headers `anthropic-ratelimit-unified-*` que a API retorna a cada request e grava em `usage-state.json`. O segmento `limit` do statusline lê esse arquivo e mostra **porcentagem da cota 5h** + **tempo até o reset**, em tempo real.
+
+**Transparência**: o proxy vê todo o tráfego, mas só grava uma allowlist de headers. Allowlist hardcoded em `proxy/proxy.py`. Escuta só em loopback.
+
+**Instalação única**: adiciona `ANTHROPIC_BASE_URL` em `~/.claude/settings.json` e liga o segmento no `daily-cost/config.json`. Requer reiniciar o Claude Code.
+
+```
+/daily-cost-enable-usage-proxy           # default: porta 8765
+/daily-cost-enable-usage-proxy porta=9999
+/daily-cost-disable-usage-proxy          # reverte tudo
+/daily-cost-disable-usage-proxy limpar   # reverte + apaga logs/state/pid
 ```
 
 ### `/daily-cost` (histórico em tabela)
@@ -68,6 +84,8 @@ git clone git@github.com:dereckleme/claude-code-daily-cost.git
 cp -r claude-code-daily-cost/daily-cost ~/.claude/skills/
 cp -r claude-code-daily-cost/daily-cost-enable-metrics-inline ~/.claude/skills/
 cp -r claude-code-daily-cost/daily-cost-disable-metrics-inline ~/.claude/skills/
+cp -r claude-code-daily-cost/daily-cost-enable-usage-proxy ~/.claude/skills/
+cp -r claude-code-daily-cost/daily-cost-disable-usage-proxy ~/.claude/skills/
 ```
 
 Pra statusline consumir o script inline, aponte `statusLine` no `~/.claude/settings.json`:
@@ -96,7 +114,8 @@ Reinicie o Claude Code. Depois rode `/daily-cost-enable-metrics-inline` e a stat
     "remaining": true,
     "reset": true,
     "branch": true,
-    "tpm_chart": true
+    "tpm_chart": true,
+    "limit": false
   },
   "monthly_limit": 100.00,
   "plan_coefficient": 0.4419,
@@ -115,6 +134,8 @@ Reinicie o Claude Code. Depois rode `/daily-cost-enable-metrics-inline` e a stat
 |-------|---------|-----------|
 | `daily-cost-enable-metrics-inline` | `/daily-cost-enable-metrics-inline` | **Liga** métricas na statusline |
 | `daily-cost-disable-metrics-inline` | `/daily-cost-disable-metrics-inline` | **Desliga** métricas na statusline |
+| `daily-cost-enable-usage-proxy` | `/daily-cost-enable-usage-proxy` | **Ativa** tracking de cota 5h em tempo real (via proxy local) |
+| `daily-cost-disable-usage-proxy` | `/daily-cost-disable-usage-proxy` | **Desativa** o proxy e reverte settings.json |
 | `daily-cost` | `/daily-cost [dias]` | Tabela com histórico de gasto |
 
 ## Requisitos

@@ -5,7 +5,7 @@ import json
 import os
 import re
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from cost import scan, business_days, resolve_projects_dir
@@ -21,8 +21,9 @@ DEFAULTS = {
     "segments": {
         "today": True, "week": True, "month": True,
         "remaining": True, "reset": True, "branch": True,
-        "tpm": True, "tpm_chart": True,
+        "tpm": True, "tpm_chart": True, "limit": False,
     },
+    "usage_stale_seconds": 900,
     "monthly_limit": 100.00,
     "plan_coefficient": 0.4419,
     "business_days": 5,
@@ -33,6 +34,47 @@ DEFAULTS = {
 }
 
 CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+USAGE_STATE_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "daily-cost-enable-usage-proxy", "proxy", "usage-state.json",
+)
+
+
+def read_usage_state():
+    try:
+        with open(USAGE_STATE_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def parse_iso_utc(ts):
+    if not ts:
+        return None
+    try:
+        if ts.endswith("Z"):
+            ts = ts[:-1] + "+00:00"
+        return datetime.fromisoformat(ts)
+    except (ValueError, TypeError):
+        return None
+
+
+def fmt_eta(td):
+    if td is None:
+        return ""
+    secs = int(td.total_seconds())
+    if secs <= 0:
+        return "agora"
+    days, rem = divmod(secs, 86400)
+    hours, rem = divmod(rem, 3600)
+    mins = rem // 60
+    if days >= 2:
+        return f"{days}d{hours}h"
+    if days >= 1:
+        return f"{days * 24 + hours}h"
+    if hours >= 1:
+        return f"{hours}h{mins:02d}"
+    return f"{mins}m"
 
 cfg = dict(DEFAULTS)
 try:
@@ -307,6 +349,55 @@ if SEG.get("week"):
 if SEG.get("today"):
     arrow, col = trend(today_cost, yesterday_cost)
     parts.append((metric("HOJE", today_cost, arrow, col), BG))
+
+if SEG.get("limit"):
+    usage = read_usage_state()
+    remaining_raw = usage.get("anthropic-ratelimit-unified-5h-remaining")
+    limit_raw = usage.get("anthropic-ratelimit-unified-5h-limit")
+    reset_5h = parse_iso_utc(usage.get("anthropic-ratelimit-unified-5h-reset"))
+    status_5h = usage.get("anthropic-ratelimit-unified-5h-status")
+    updated_at = parse_iso_utc(usage.get("updated_at"))
+    now_utc = datetime.now(timezone.utc)
+    stale_threshold = int(cfg.get("usage_stale_seconds", 900))
+    is_stale = updated_at is not None and (
+        (now_utc - updated_at).total_seconds() > stale_threshold
+    )
+
+    try:
+        remaining_n = int(remaining_raw) if remaining_raw is not None else None
+    except (TypeError, ValueError):
+        remaining_n = None
+    try:
+        limit_n = int(limit_raw) if limit_raw is not None else None
+    except (TypeError, ValueError):
+        limit_n = None
+
+    if remaining_n is not None and limit_n and limit_n > 0:
+        used_pct = max(0.0, min(100.0, 100.0 * (1 - remaining_n / limit_n)))
+    else:
+        used_pct = None
+
+    if status_5h == "exceeded" or (used_pct is not None and used_pct >= 95):
+        lim_col = RED
+    elif status_5h == "warning" or (used_pct is not None and used_pct >= 80):
+        lim_col = YELLOW
+    elif used_pct is None and remaining_n is None:
+        lim_col = None
+    else:
+        lim_col = GREEN
+
+    if lim_col is not None:
+        if used_pct is not None:
+            value_str = c(lim_col + ";1", f"{used_pct:.0f}%")
+        else:
+            value_str = c(lim_col + ";1", f"{remaining_n:,} rem")
+        extras = []
+        if reset_5h is not None:
+            extras.append(f"{c(GRAY, 'RESET')} {c(ACCENT, fmt_eta(reset_5h - now_utc))}")
+        if is_stale:
+            extras.append(c(DEEP_GRAY + ";3", "stale"))
+        tail = f"{mid}{mid.join(extras)}" if extras else ""
+        parts.append((f"{c(GRAY, 'LIMITE')} {value_str}{tail}", BG))
 
 tpm_overload = False
 tpm_text = ""

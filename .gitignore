@@ -3,3 +3,9 @@ __pycache__/
 *.egg-info/
 .venv/
 .DS_Store
+
+# proxy runtime artifacts
+daily-cost-enable-usage-proxy/proxy/proxy.pid
+daily-cost-enable-usage-proxy/proxy/proxy.log
+daily-cost-enable-usage-proxy/proxy/usage-state.json
+daily-cost-enable-usage-proxy/proxy/usage-state.json.tmp

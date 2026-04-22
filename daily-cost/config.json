@@ -6,9 +6,10 @@
     "remaining": true,
     "reset": true,
     "branch": true,
-    "tpm_chart": true
+    "tpm_chart": true,
+    "limit": false
   },
-  "monthly_limit": 100.00,
+  "monthly_limit": 100.0,
   "plan_coefficient": 0.4419,
   "business_days": 5
 }
