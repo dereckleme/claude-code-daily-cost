@@ -10,10 +10,12 @@ Skills para acompanhar o gasto do [Claude Code](https://claude.com/claude-code) 
 
 Liga **todos** os segmentos do statusline e sobe o proxy HTTP local que captura os headers `anthropic-ratelimit-*` da Anthropic pra mostrar a cota de 5h em tempo real.
 
-- Edita `~/.claude/skills/daily-cost/config.json` setando todos os `segments.*` = `true`.
+- Edita `<CCD>/skills/daily-cost/config.json` setando todos os `segments.*` = `true`.
 - Sobe o daemon em `127.0.0.1:8765` via `daily-cost/proxy/ensure-proxy.sh`.
-- Adiciona `env.ANTHROPIC_BASE_URL=http://127.0.0.1:8765` em `~/.claude/settings.json`.
+- Adiciona `env.ANTHROPIC_BASE_URL=http://127.0.0.1:8765` em `<CCD>/settings.json`.
 - **Requer reiniciar o Claude Code** (a env var só entra em vigor em sessões novas).
+
+`<CCD>` = config dir ativo da sessão. Se você só tem `~/.claude`, é ele. Se tem múltiplos (`~/.claude`, `~/.claude-pessoal`, …), o próprio skill detecta qual está ativo via `$CLAUDE_CONFIG_DIR` env, inspeção do processo claude (`lsof`) ou mtime dos transcripts.
 
 ```
 /daily-cost-analytics-enable             # default: porta 8765
@@ -76,7 +78,9 @@ cp -r claude-code-daily-cost/daily-cost-analytics-enable ~/.claude/skills/
 cp -r claude-code-daily-cost/daily-cost-analytics-disable ~/.claude/skills/
 ```
 
-Aponte a statusline pro script inline em `~/.claude/settings.json`:
+> **Múltiplos config dirs** (`~/.claude`, `~/.claude-pessoal`, …)? Copie as skills pra cada dir que você usa. O projeto detecta o config dir ativo em runtime — não assume `~/.claude` em lugar nenhum.
+
+Aponte a statusline pro script inline no `settings.json` do(s) dir(s) onde instalou:
 
 ```json
 {
@@ -87,11 +91,11 @@ Aponte a statusline pro script inline em `~/.claude/settings.json`:
 }
 ```
 
-Reinicie o Claude Code. Depois rode `/daily-cost-analytics-enable` pra ligar o painel.
+(Troque `~/.claude` pelo dir correspondente em cada `settings.json`.) Reinicie o Claude Code. Depois rode `/daily-cost-analytics-enable` pra ligar o painel.
 
 ## Configuração
 
-`~/.claude/skills/daily-cost/config.json`:
+`<CCD>/skills/daily-cost/config.json`:
 
 ```json
 {
@@ -125,4 +129,5 @@ Reinicie o Claude Code. Depois rode `/daily-cost-analytics-enable` pra ligar o p
 ## Requisitos
 
 - Python 3
-- Claude Code instalado com transcripts em `~/.claude/projects/`
+- Claude Code instalado com transcripts em `<CCD>/projects/` (detectado automaticamente)
+- `lsof` e `ps` disponíveis (default no macOS/Linux) — usados pra resolver o config dir da sessão ativa quando existem múltiplos `~/.claude*`
