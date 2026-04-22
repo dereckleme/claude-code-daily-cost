@@ -19,7 +19,7 @@ if [[ -f "$PID_FILE" ]]; then
   else
     echo "proxy não estava rodando"
   fi
-  rm -f "$PID_FILE"
+  rm -f "$PID_FILE" "$HERE/proxy.session"
 else
   echo "proxy não estava rodando"
 fi
