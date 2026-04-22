@@ -1,16 +1,19 @@
 #!/usr/bin/env bash
 # Sobe o proxy para esta instância do Claude Code. Idempotente dentro da mesma
 # sessão; se detectar uma sessão diferente, mata o proxy antigo e sobe um novo.
+# Se a porta solicitada estiver ocupada, avança automaticamente para a próxima
+# porta livre e persiste o valor resolvido em config.json e settings.json.
 #
 # Uso: ensure-proxy.sh [port]
-# Env: CLAUDE_USAGE_PROXY_PORT (default 8765)
+# Prioridade de porta: arg[1] > CLAUDE_USAGE_PROXY_PORT > config.json > 8765
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROXY_PY="$HERE/proxy.py"
 PID_FILE="$HERE/proxy.pid"
-SESSION_FILE="$HERE/proxy.session"  # armazena PID do processo Claude pai
-PORT="${1:-${CLAUDE_USAGE_PROXY_PORT:-8765}}"
+SESSION_FILE="$HERE/proxy.session"
+CONFIG_JSON="$HERE/../config.json"
+SETTINGS_JSON="$HERE/../../../settings.json"
 
 # Detecta o PID do processo Claude Code ancestral percorrendo a árvore de processos.
 find_claude_pid() {
@@ -32,6 +35,22 @@ find_claude_pid() {
 
 CLAUDE_PID="$(find_claude_pid)"
 
+# Resolve porta inicial: arg > env > config.json > 8765
+config_port() {
+  [[ -f "$CONFIG_JSON" ]] || { echo ""; return; }
+  python3 -c "
+import json, sys
+try:
+    d = json.load(open('$CONFIG_JSON'))
+    print(d.get('proxy_port', ''))
+except Exception:
+    print('')
+" 2>/dev/null || echo ""
+}
+
+_config_port="$(config_port)"
+PORT="${1:-${CLAUDE_USAGE_PROXY_PORT:-${_config_port:-8765}}}"
+
 # Aponta LOG_FILE para um arquivo timestamped; cria symlink proxy.log → atual
 new_log_file() {
   local ts
@@ -50,8 +69,9 @@ alive() {
 }
 
 port_responding() {
+  local p="${1:-$PORT}"
   curl -s -o /dev/null --connect-timeout 1 -w "%{http_code}" \
-    "http://127.0.0.1:$PORT/_usage_proxy_health" 2>/dev/null | grep -qE '^2[0-9][0-9]$'
+    "http://127.0.0.1:$p/_usage_proxy_health" 2>/dev/null | grep -qE '^2[0-9][0-9]$'
 }
 
 same_session() {
@@ -62,8 +82,27 @@ same_session() {
   [[ "$stored" == "$CLAUDE_PID" ]]
 }
 
+# Persiste porta resolvida em config.json e settings.json do env.
+persist_port() {
+  local port="$1"
+  [[ -f "$CONFIG_JSON" ]] && python3 - "$CONFIG_JSON" "$port" <<'PYEOF'
+import json, sys
+path, port = sys.argv[1], int(sys.argv[2])
+with open(path) as f: d = json.load(f)
+d['proxy_port'] = port
+with open(path, 'w') as f: json.dump(d, f, indent=4)
+PYEOF
+  [[ -f "$SETTINGS_JSON" ]] && python3 - "$SETTINGS_JSON" "$port" <<'PYEOF'
+import json, sys
+path, port = sys.argv[1], int(sys.argv[2])
+with open(path) as f: d = json.load(f)
+d.setdefault('env', {})['ANTHROPIC_BASE_URL'] = f'http://127.0.0.1:{port}'
+with open(path, 'w') as f: json.dump(d, f, indent=4)
+PYEOF
+}
+
 # Proxy vivo E mesma sessão → reutiliza
-if alive && port_responding && same_session; then
+if alive && port_responding "$PORT" && same_session; then
   echo "proxy já no ar para esta sessão (pid $(cat "$PID_FILE"), port $PORT)"
   exit 0
 fi
@@ -84,12 +123,13 @@ fi
 
 rm -f "$PID_FILE" "$SESSION_FILE"
 
-# Porta ocupada por processo externo → erro
-if lsof -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
-  echo "erro: porta $PORT ocupada por outro processo" >&2
-  echo "resolva o conflito ou use CLAUDE_USAGE_PROXY_PORT=<outra_porta>" >&2
-  exit 1
-fi
+# Avança para a próxima porta livre — nunca falha por conflito de porta.
+while lsof -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; do
+  echo "porta $PORT ocupada, tentando $((PORT + 1))..." >&2
+  PORT=$((PORT + 1))
+done
+
+persist_port "$PORT"
 
 LOG_FILE="$(new_log_file)"
 
@@ -101,7 +141,7 @@ disown || true
 
 # Aguarda até 3s pela porta responder
 for _ in $(seq 1 30); do
-  if port_responding; then
+  if port_responding "$PORT"; then
     echo "proxy iniciado (pid $(cat "$PID_FILE"), port $PORT, log $(basename "$LOG_FILE"))"
     exit 0
   fi
