@@ -19,15 +19,15 @@ Inverso de `/daily-cost-analytics-enable`. Deixa o Claude Code falando direto co
    - Setar todos os campos do bloco `segments` (`today`, `week`, `month`, `reset`, `branch`, `tpm`, `tpm_chart`, `limit`) = `false`.
    - Com todos desligados, a statusline fica completamente vazia (nem o prefixo `$$ DAILY COST $$` é impresso).
 
-2. **Matar o proxy**:
-   ```bash
-   bash "$CCD/skills/daily-cost/proxy/teardown.sh"
-   ```
-
-3. **Remover `env.ANTHROPIC_BASE_URL`** de `$CCD/settings.json` (último passo — altera a conexão somente após todo o resto estar desligado):
+2. **Remover `env.ANTHROPIC_BASE_URL`** de `$CCD/settings.json` (penúltimo — reverte a conexão antes de parar o servidor):
    - Se o valor apontar pra `http://127.0.0.1:*` (qualquer porta local), remova essa chave.
    - Se `env` ficar vazio depois, remova o bloco `env` inteiro.
    - Se apontar pra outra coisa (Bedrock, Vertex, outro proxy externo), **não mexer** e avisar o usuário que o valor não é do daily-cost.
+
+3. **Matar o proxy** (último passo — só para o servidor após tudo mais estar desligado):
+   ```bash
+   bash "$CCD/skills/daily-cost/proxy/teardown.sh"
+   ```
 
 4. **Avisar**: "Reinicie Claude Code pra voltar a falar direto com api.anthropic.com. Até reiniciar, a sessão atual continua usando a URL anterior (proxy já parado) e vai falhar nos próximos requests."
 
