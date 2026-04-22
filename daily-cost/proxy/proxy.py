@@ -2,23 +2,18 @@
 """Reverse proxy to api.anthropic.com that captures rate-limit headers.
 
 Every response from upstream has `anthropic-ratelimit-*` headers. We snapshot
-the ones in CAPTURED_PREFIXES/CAPTURED_EXACT into `usage-state-<label>.json`
-next to this file, where `<label>` identifies the calling Claude Code config
-dir (`.claude` → `default`, `.claude-pessoal` → `pessoal`, …). The client
-tags each request by prefixing the URL with `/_env_<label>` — we strip that
-segment before forwarding upstream. Body is never read nor stored.
+the ones in CAPTURED_PREFIXES/CAPTURED_EXACT into usage-state.json next to
+this file. Body is never read nor stored — we stream it straight through.
 
 Env:
     CLAUDE_USAGE_PROXY_PORT (default 8765)
     CLAUDE_USAGE_PROXY_BIND (default 127.0.0.1)
     CLAUDE_USAGE_UPSTREAM   (default api.anthropic.com)
 """
-import glob
 import http.client
 import http.server
 import json
 import os
-import re
 import socketserver
 import ssl
 import sys
@@ -26,19 +21,12 @@ import threading
 from datetime import datetime, timezone
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+STATE_FILE = os.path.join(HERE, "usage-state.json")
 
 UPSTREAM_HOST = os.environ.get("CLAUDE_USAGE_UPSTREAM", "api.anthropic.com")
 PORT = int(os.environ.get("CLAUDE_USAGE_PROXY_PORT", "8765"))
 BIND = os.environ.get("CLAUDE_USAGE_PROXY_BIND", "127.0.0.1")
 HEALTH_PATH = "/_usage_proxy_health"
-
-ENV_PREFIX_RE = re.compile(r"^/_env_([a-z0-9_-]+)(?=/|$)")
-DEFAULT_LABEL = "default"
-
-
-def state_file_for(label):
-    safe = re.sub(r"[^a-z0-9_-]+", "-", (label or DEFAULT_LABEL).lower()).strip("-") or DEFAULT_LABEL
-    return os.path.join(HERE, f"usage-state-{safe}.json")
 
 HOP_HEADERS = {
     "connection", "keep-alive", "proxy-authenticate", "proxy-authorization",
@@ -51,7 +39,7 @@ CAPTURED_EXACT = {"retry-after", "anthropic-request-id"}
 _state_lock = threading.Lock()
 
 
-def update_state(label, headers_list):
+def update_state(headers_list):
     captured = {}
     for k, v in headers_list:
         lk = k.lower()
@@ -60,28 +48,22 @@ def update_state(label, headers_list):
     if not captured:
         return
     captured["updated_at"] = datetime.now(timezone.utc).isoformat()
-    captured["env_label"] = label
-    path = state_file_for(label)
-    tmp = path + ".tmp"
+    tmp = STATE_FILE + ".tmp"
     with _state_lock:
         try:
             with open(tmp, "w", encoding="utf-8") as f:
                 json.dump(captured, f)
-            os.replace(tmp, path)
+            os.replace(tmp, STATE_FILE)
         except OSError:
             pass
 
 
-def read_all_states():
-    out = {}
-    for path in glob.glob(os.path.join(HERE, "usage-state-*.json")):
-        label = os.path.basename(path)[len("usage-state-"):-len(".json")]
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                out[label] = json.load(f)
-        except (OSError, json.JSONDecodeError):
-            continue
-    return out
+def read_state():
+    try:
+        with open(STATE_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return {}
 
 
 class ProxyHandler(http.server.BaseHTTPRequestHandler):
@@ -89,7 +71,7 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
     timeout = 600
 
     def _send_health(self):
-        body = json.dumps({"ok": True, "envs": read_all_states()}).encode()
+        body = json.dumps({"ok": True, "state": read_state()}).encode()
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
@@ -100,14 +82,6 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
         except (BrokenPipeError, ConnectionResetError):
             pass
         self.close_connection = True
-
-    def _split_env_label(self, path):
-        m = ENV_PREFIX_RE.match(path)
-        if not m:
-            return DEFAULT_LABEL, path
-        label = m.group(1)
-        rest = path[m.end():] or "/"
-        return label, rest
 
     def _read_body(self):
         te = (self.headers.get("transfer-encoding") or "").lower()
@@ -137,8 +111,6 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
         if self.path == HEALTH_PATH:
             return self._send_health()
 
-        label, upstream_path = self._split_env_label(self.path)
-
         body = self._read_body() if method in ("POST", "PUT", "PATCH", "DELETE") else b""
         headers = {}
         for k, v in self.headers.items():
@@ -152,7 +124,7 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
         ctx = ssl.create_default_context()
         conn = http.client.HTTPSConnection(UPSTREAM_HOST, timeout=self.timeout, context=ctx)
         try:
-            conn.request(method, upstream_path, body=body if body else None, headers=headers)
+            conn.request(method, self.path, body=body if body else None, headers=headers)
             resp = conn.getresponse()
         except Exception as e:
             try:
@@ -166,7 +138,7 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
             return
 
         try:
-            update_state(label, resp.getheaders())
+            update_state(resp.getheaders())
             self.send_response(resp.status, resp.reason)
             for k, v in resp.getheaders():
                 lk = k.lower()

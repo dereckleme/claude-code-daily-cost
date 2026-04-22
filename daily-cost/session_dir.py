@@ -152,32 +152,5 @@ def resolve_projects_dir(stdin_ctx=None):
     return os.path.join(resolve_config_dir(), "projects")
 
 
-_LABEL_SAFE_RE = re.compile(r"[^a-z0-9_-]+")
-
-
-def env_label(config_dir):
-    """Slug curto que identifica um config dir (`~/.claude-pessoal` → `pessoal`).
-
-    Usado pelo proxy pra separar state por env quando a mesma instância
-    atende múltiplos `.claude*/`. `.claude` (ou qualquer fallback) vira
-    `default`.
-    """
-    if not config_dir:
-        return "default"
-    name = os.path.basename(os.path.normpath(config_dir)).lower()
-    if name.startswith(".claude-"):
-        tail = name[len(".claude-"):]
-    elif name.startswith(".claude"):
-        tail = name[len(".claude"):]
-    else:
-        tail = name
-    tail = _LABEL_SAFE_RE.sub("-", tail).strip("-")
-    return tail or "default"
-
-
 if __name__ == "__main__":
-    import sys
-    if len(sys.argv) > 1 and sys.argv[1] == "label":
-        print(env_label(resolve_config_dir()))
-    else:
-        print(resolve_config_dir())
+    print(resolve_config_dir())

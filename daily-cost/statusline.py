@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from cost import scan, business_days
-from session_dir import resolve_projects_dir, env_label
+from session_dir import resolve_projects_dir
 from by_branch import aggregate as aggregate_branch, current_branch, fmt_tokens
 
 stdin_ctx = {}
@@ -34,23 +34,18 @@ DEFAULTS = {
 }
 
 CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
-PROXY_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "proxy")
+USAGE_STATE_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    "proxy", "usage-state.json",
+)
 
 
-def read_usage_state(label):
-    """Lê `usage-state-<label>.json`. Cai pro `usage-state.json` legado se
-    o rotulado ainda não existe (proxy rodando em versão anterior)."""
-    candidates = [
-        os.path.join(PROXY_DIR, f"usage-state-{label}.json"),
-        os.path.join(PROXY_DIR, "usage-state.json"),
-    ]
-    for path in candidates:
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except (OSError, json.JSONDecodeError):
-            continue
-    return {}
+def read_usage_state():
+    try:
+        with open(USAGE_STATE_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return {}
 
 
 def parse_iso_utc(ts):
@@ -172,7 +167,6 @@ while cursor <= prev_month_end:
     cursor += timedelta(days=1)
 
 projects_dir = resolve_projects_dir(stdin_ctx)
-active_env_label = env_label(os.path.dirname(projects_dir))
 scanned = scan(days_set, projects_dir=projects_dir)
 daily = scanned["daily"]
 minutes = scanned["minutes"]
@@ -353,7 +347,7 @@ if SEG.get("today"):
     parts.append((metric("HOJE", today_cost, arrow, col), BG))
 
 if SEG.get("limit"):
-    usage = read_usage_state(active_env_label)
+    usage = read_usage_state()
     remaining_raw = usage.get("anthropic-ratelimit-unified-5h-remaining")
     limit_raw = usage.get("anthropic-ratelimit-unified-5h-limit")
     reset_5h = parse_iso_utc(usage.get("anthropic-ratelimit-unified-5h-reset"))
@@ -422,7 +416,7 @@ if SEG.get("tpm") and avg_tpm > 0:
         f"{avg_str} {c(status_col, status_txt)}"
     )
 
-    _usage = read_usage_state(active_env_label)
+    _usage = read_usage_state()
     _claim = _usage.get("anthropic-ratelimit-unified-representative-claim")
     _util_raw = None
     if _claim == "overage":
