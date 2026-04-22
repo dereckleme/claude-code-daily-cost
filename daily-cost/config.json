@@ -3,13 +3,12 @@
     "today": true,
     "week": true,
     "month": true,
-    "remaining": true,
     "reset": true,
     "branch": true,
+    "tpm": true,
     "tpm_chart": true,
-    "limit": false
+    "limit": true
   },
-  "monthly_limit": 100.0,
   "plan_coefficient": 0.4419,
   "business_days": 5
 }

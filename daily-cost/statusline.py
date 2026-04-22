@@ -20,11 +20,10 @@ except Exception:
 DEFAULTS = {
     "segments": {
         "today": True, "week": True, "month": True,
-        "remaining": True, "reset": True, "branch": True,
+        "reset": True, "branch": True,
         "tpm": True, "tpm_chart": True, "limit": False,
     },
     "usage_stale_seconds": 900,
-    "monthly_limit": 100.00,
     "plan_coefficient": 0.4419,
     "business_days": 5,
     "trend_tolerance_pct": 10.0,
@@ -35,8 +34,8 @@ DEFAULTS = {
 
 CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
 USAGE_STATE_PATH = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "daily-cost-enable-usage-proxy", "proxy", "usage-state.json",
+    os.path.dirname(os.path.abspath(__file__)),
+    "proxy", "usage-state.json",
 )
 
 
@@ -89,7 +88,6 @@ except (OSError, json.JSONDecodeError):
     pass
 
 DAYS = int(cfg["business_days"])
-MONTHLY_LIMIT = float(cfg["monthly_limit"])
 COEF = float(cfg["plan_coefficient"])
 SEG = cfg["segments"]
 TOL = float(cfg.get("trend_tolerance_pct", 10.0)) / 100.0
@@ -179,7 +177,6 @@ month_cost = sum(daily[d]["cost"] for d in days_set if month_start <= d <= today
 month_prev_cost = sum(
     daily[d]["cost"] for d in days_set if prev_month_start <= d <= prev_month_end
 ) * COEF
-remaining = max(MONTHLY_LIMIT - month_cost, 0.0)
 reset_str = f"{next_reset.day} {MESES_PT[next_reset.month - 1]}"
 
 biz_current_set = set(biz_current)
@@ -332,13 +329,11 @@ if SEG.get("month"):
     value_str = c(col + ";1", f"${month_cost:.2f}")
     arrow_str = c(col + ";1", arrow)
     extras = []
-    if SEG.get("remaining"):
-        extras.append(f"{c(GRAY, 'SOBRA')} {c(LIGHT, f'${remaining:.2f}')}")
     if SEG.get("reset"):
         extras.append(f"{c(GRAY, 'RESET')} {c(ACCENT, reset_str)}")
     tail = f"{mid}{mid.join(extras)}" if extras else ""
     parts.append((
-        f"{c(GRAY, 'MÊS')} {value_str}{slash}{c(GRAY, f'${MONTHLY_LIMIT:.0f}')} {arrow_str}{tail}",
+        f"{c(GRAY, 'MÊS')} {value_str} {arrow_str}{tail}",
         BG,
     ))
 
@@ -419,6 +414,51 @@ if SEG.get("tpm") and avg_tpm > 0:
         f"{c(GRAY, 'TPM')} {cur_str} {c(GRAY, 'agora')}{slash}"
         f"{avg_str} {c(status_col, status_txt)}"
     )
+
+    _usage = read_usage_state()
+    _claim = _usage.get("anthropic-ratelimit-unified-representative-claim")
+    _util_raw = None
+    if _claim == "overage":
+        _util_raw = _usage.get("anthropic-ratelimit-unified-overage-utilization")
+    elif _claim == "fallback":
+        _util_raw = _usage.get("anthropic-ratelimit-unified-fallback-percentage")
+    if _util_raw is None:
+        _util_raw = (
+            _usage.get("anthropic-ratelimit-unified-utilization")
+            or _usage.get("anthropic-ratelimit-unified-overage-utilization")
+            or _usage.get("anthropic-ratelimit-unified-fallback-percentage")
+        )
+    try:
+        _used_pct = float(_util_raw) * 100 if _util_raw is not None else None
+    except (TypeError, ValueError):
+        _used_pct = None
+
+    if _used_pct is not None:
+        _remaining_pct = max(0.0, 100.0 - _used_pct)
+        if _used_pct >= 95:
+            _q_col = RED
+        elif _used_pct >= 80:
+            _q_col = YELLOW
+        else:
+            _q_col = GREEN
+        _reset_ts = (
+            _usage.get("anthropic-ratelimit-unified-overage-reset")
+            if _claim == "overage"
+            else _usage.get("anthropic-ratelimit-unified-reset")
+        ) or _usage.get("anthropic-ratelimit-unified-reset")
+        _reset_tail = ""
+        try:
+            if _reset_ts:
+                _reset_dt = datetime.fromtimestamp(int(_reset_ts), tz=timezone.utc)
+                _eta = fmt_eta(_reset_dt - datetime.now(timezone.utc))
+                _reset_tail = f" {c(DEEP_GRAY, '(' + _eta + ')')}"
+        except (TypeError, ValueError):
+            pass
+        tpm_text += (
+            f"{mid}{c(GRAY, 'COTA FALTA')} "
+            f"{c(_q_col + ';1', f'{_remaining_pct:.0f}%')}"
+            f" {c(DEEP_GRAY, f'({_used_pct:.0f}% usado)')}{_reset_tail}"
+        )
 
 if SEG.get("branch") and branch_name:
     if btokens > 0:
