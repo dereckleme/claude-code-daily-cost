@@ -421,11 +421,14 @@ if SEG.get("tpm") and avg_tpm > 0:
     _util_raw = None
     if _claim == "overage":
         _util_raw = _usage.get("anthropic-ratelimit-unified-overage-utilization")
+    elif _claim == "five_hour":
+        _util_raw = _usage.get("anthropic-ratelimit-unified-5h-utilization")
     elif _claim == "fallback":
         _util_raw = _usage.get("anthropic-ratelimit-unified-fallback-percentage")
     if _util_raw is None:
         _util_raw = (
             _usage.get("anthropic-ratelimit-unified-utilization")
+            or _usage.get("anthropic-ratelimit-unified-5h-utilization")
             or _usage.get("anthropic-ratelimit-unified-overage-utilization")
             or _usage.get("anthropic-ratelimit-unified-fallback-percentage")
         )
@@ -442,11 +445,13 @@ if SEG.get("tpm") and avg_tpm > 0:
             _q_col = YELLOW
         else:
             _q_col = GREEN
-        _reset_ts = (
-            _usage.get("anthropic-ratelimit-unified-overage-reset")
-            if _claim == "overage"
-            else _usage.get("anthropic-ratelimit-unified-reset")
-        ) or _usage.get("anthropic-ratelimit-unified-reset")
+        if _claim == "overage":
+            _reset_ts = _usage.get("anthropic-ratelimit-unified-overage-reset")
+        elif _claim == "five_hour":
+            _reset_ts = _usage.get("anthropic-ratelimit-unified-5h-reset")
+        else:
+            _reset_ts = None
+        _reset_ts = _reset_ts or _usage.get("anthropic-ratelimit-unified-reset")
         _reset_tail = ""
         try:
             if _reset_ts:
