@@ -23,10 +23,19 @@ for _ in 1 2 3 4 5 6 7 8; do
   [[ -z "$parent" || "$parent" == "0" || "$parent" == "1" ]] && break
   cmd=$(ps -o command= -p "$parent" 2>/dev/null || true)
   if [[ -n "$cmd" && "$cmd" == *claude* ]]; then
-    dir=$(lsof -p "$parent" 2>/dev/null \
-      | awk 'match($0, /\/[^ ]*\/\.claude[^\/ ]*/) { print substr($0, RSTART, RLENGTH); exit }')
-    if [[ -n "$dir" && -d "$dir" ]]; then
-      echo "$dir"
+    fallback=""
+    while IFS= read -r d; do
+      [[ -d "$d" ]] || continue
+      if [[ "$(dirname "$d")" == "$HOME" ]]; then
+        echo "$d"
+        exit 0
+      fi
+      [[ -z "$fallback" ]] && fallback="$d"
+    done < <(lsof -p "$parent" 2>/dev/null \
+      | awk 'match($0, /\/[^ ]*\/\.claude[^\/ ]*/) { print substr($0, RSTART, RLENGTH) }' \
+      | sort -u)
+    if [[ -n "$fallback" ]]; then
+      echo "$fallback"
       exit 0
     fi
   fi
