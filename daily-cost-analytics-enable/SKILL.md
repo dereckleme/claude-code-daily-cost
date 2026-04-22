@@ -33,17 +33,13 @@ Skill única pra ligar **tudo** do daily-cost de uma vez: segmentos do statuslin
 
 1. **Ligar segmentos** editando `$CCD/skills/daily-cost/config.json` → bloco `segments` com todos os campos `true` (`today`, `week`, `month`, `reset`, `branch`, `tpm`, `tpm_chart`, `limit`).
 
-2. **Determinar a porta** lendo `proxy_port` de `$CCD/skills/daily-cost/config.json` (default `8765`). Se a porta estiver ocupada por um processo que **não** responde ao health check (`/_usage_proxy_health` com 2xx), escolha a próxima porta livre (8766, 8767, …) e salve em `config.json["proxy_port"]`. Se o nosso proxy já estiver respondendo nessa porta, reuse-o.
+2. **Determinar a porta** lendo `proxy_port` de `$CCD/skills/daily-cost/config.json` (default `8765`). Esse é apenas o ponto de partida — o `ensure-proxy.sh` avança automaticamente para a próxima porta livre e persiste o valor resolvido em `config.json` e `settings.json`. Se o argumento `porta=<N>` foi passado, salve-o em `config.json["proxy_port"]` antes de continuar.
 
-3. **Subir proxy**: `CLAUDE_USAGE_PROXY_PORT=<porta> bash "$CCD/skills/daily-cost/proxy/ensure-proxy.sh"`.
+3. **Subir proxy**: `bash "$CCD/skills/daily-cost/proxy/ensure-proxy.sh"`. O script lê `config.json` para a porta inicial, auto-avança se ocupada e atualiza ambos os arquivos com a porta resolvida.
 
 4. **Health check**: `curl -s http://127.0.0.1:<porta>/_usage_proxy_health` deve retornar `{"ok": true, "state": {...}}`.
 
-5. **Inserir ANTHROPIC_BASE_URL** em `$CCD/settings.json` no bloco `env`:
-   ```json
-   { "env": { "ANTHROPIC_BASE_URL": "http://127.0.0.1:<porta>" } }
-   ```
-   Se já existia apontando pra outro lugar (Bedrock/Vertex/outro proxy externo que **não** seja `http://127.0.0.1:*`), **pergunte** antes de sobrescrever.
+5. **Verificar ANTHROPIC_BASE_URL** em `$CCD/settings.json` — o `ensure-proxy.sh` já atualizou automaticamente. Apenas confirme que aponta para `http://127.0.0.1:<porta_resolvida>`. Se ainda apontar para outro lugar (Bedrock/Vertex/outro proxy externo que **não** seja `http://127.0.0.1:*`), **pergunte** antes de sobrescrever.
 
 6. **Avisar**: "⚠️ Reinicie Claude Code pra ativar o tracking. A env var só entra em vigor em sessões novas."
 
