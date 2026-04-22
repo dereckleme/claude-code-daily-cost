@@ -65,11 +65,22 @@ Skill única pra ligar **tudo** do daily-cost de uma vez: segmentos do statuslin
 | Arquivo | Ação |
 |---|---|
 | `$CCD/skills/daily-cost/proxy/proxy.pid` | criado |
-| `$CCD/skills/daily-cost/proxy/proxy.log` | criado (append) |
+| `$CCD/skills/daily-cost/proxy/proxy.session` | criado (PID do Claude Code desta sessão) |
+| `$CCD/skills/daily-cost/proxy/proxy_YYYYMMDDTHHMMSS.log` | criado (log da sessão) |
+| `$CCD/skills/daily-cost/proxy/proxy.log` | symlink → log da sessão atual |
 | `$CCD/skills/daily-cost/proxy/usage-state.json` | criado/atualizado a cada request |
 | `$CCD/settings.json` | adiciona `env.ANTHROPIC_BASE_URL` |
 | `$CCD/skills/daily-cost/config.json` | seta todos os `segments.*` = `true` e `proxy_port` |
 
+## Proxy por instância do Claude Code
+
+Cada vez que `ensure-proxy.sh` é chamado, o script detecta o PID do processo Claude Code pai (percorrendo a árvore de processos). Esse PID é gravado em `proxy.session`.
+
+- **Mesma sessão**: se o proxy já está no ar e `proxy.session` bate com o Claude Code atual → reutiliza (idempotente).
+- **Nova sessão** (Claude Code foi reiniciado ou é outra janela): o proxy antigo é encerrado e um novo é iniciado com um arquivo de log dedicado.
+
+Logs são nomeados com timestamp: `proxy_YYYYMMDDTHHMMSS.log`. O symlink `proxy.log` aponta sempre para o log da sessão atual.
+
 ## Multi-env (`.claude` + `.claude-pessoal` etc.)
 
-Cada env roda seu próprio proxy em sua própria porta. O `proxy.pid`, `proxy.log` e `usage-state.json` ficam em `$CCD/skills/daily-cost/proxy/` — já isolados por env. Configure portas diferentes em cada `config.json["proxy_port"]` (ex.: 8765 e 8766). O `teardown` de um env mata só o daemon daquele env.
+Cada env roda seu próprio proxy em sua própria porta, com arquivos (`proxy.pid`, `proxy.session`, `proxy_*.log`, `usage-state.json`) isolados em `$CCD/skills/daily-cost/proxy/`. Configure portas diferentes em cada `config.json["proxy_port"]` (ex.: 8765 e 8766). O `teardown` de um env mata só o daemon daquele env.
