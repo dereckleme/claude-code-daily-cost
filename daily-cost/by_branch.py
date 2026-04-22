@@ -8,7 +8,8 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from cost import cost_for, total_tokens, resolve_projects_dir
+from cost import cost_for, total_tokens
+from session_dir import resolve_projects_dir
 
 CACHE_TTL_SEC = 10
 CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")

@@ -8,7 +8,8 @@ import sys
 from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from cost import scan, business_days, resolve_projects_dir
+from cost import scan, business_days
+from session_dir import resolve_projects_dir
 from by_branch import aggregate as aggregate_branch, current_branch, fmt_tokens
 
 stdin_ctx = {}

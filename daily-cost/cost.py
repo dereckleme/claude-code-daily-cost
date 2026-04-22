@@ -7,6 +7,9 @@ import sys
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from session_dir import resolve_projects_dir  # noqa: E402
+
 # USD per 1M tokens. Update if pricing changes.
 PRICING = {
     "claude-opus-4-7":        {"in": 15.00, "out": 75.00, "cw5m": 18.75, "cw1h": 30.00, "cr": 1.50},
@@ -82,69 +85,6 @@ def business_days(days: int, today=None):
         cursor -= timedelta(days=1)
     ordered.reverse()
     return ordered
-
-
-def _latest_jsonl_mtime(projects_dir):
-    """Max mtime across all .jsonl transcripts under projects_dir (-1 if none)."""
-    latest = -1.0
-    try:
-        for entry in os.listdir(projects_dir):
-            sub = os.path.join(projects_dir, entry)
-            if not os.path.isdir(sub):
-                continue
-            try:
-                for f in os.listdir(sub):
-                    if not f.endswith(".jsonl"):
-                        continue
-                    try:
-                        mt = os.path.getmtime(os.path.join(sub, f))
-                    except OSError:
-                        continue
-                    if mt > latest:
-                        latest = mt
-            except OSError:
-                continue
-    except OSError:
-        pass
-    return latest
-
-
-def resolve_projects_dir(stdin_ctx=None):
-    """Resolve the Claude Code projects dir for the session that is active now.
-
-    Priority:
-      1. transcript_path from stdin (statusline receives it from Claude Code)
-      2. CLAUDE_CONFIG_DIR env var (explicit override)
-      3. Auto-detect: among ~/.claude* config dirs, pick the one whose
-         projects/ has the most recently modified .jsonl — the live session.
-
-    No path is hardcoded to a specific variant (.claude vs .claude-pessoal vs
-    anything else) — selection always reflects whichever session is active.
-    """
-    if stdin_ctx:
-        tp = stdin_ctx.get("transcript_path")
-        if tp:
-            return os.path.dirname(os.path.dirname(tp))
-    env = os.environ.get("CLAUDE_CONFIG_DIR")
-    if env:
-        return os.path.join(os.path.expanduser(env), "projects")
-    home = os.path.expanduser("~")
-    best = None
-    best_mtime = -1.0
-    try:
-        for entry in os.listdir(home):
-            if not entry.startswith(".claude"):
-                continue
-            projects = os.path.join(home, entry, "projects")
-            if not os.path.isdir(projects):
-                continue
-            mt = _latest_jsonl_mtime(projects)
-            if mt > best_mtime:
-                best_mtime = mt
-                best = projects
-    except OSError:
-        pass
-    return best or os.path.join(home, ".claude", "projects")
 
 
 def scan(allowed_days, projects_dir=None):
