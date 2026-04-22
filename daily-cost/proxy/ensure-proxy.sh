@@ -20,22 +20,28 @@ alive() {
 }
 
 port_responding() {
-  # 2xx/4xx/5xx = processo HTTP ativo; curl --connect-timeout evita hang
+  # /_usage_proxy_health retornando 2xx = é *o nosso* proxy (path é único)
   curl -s -o /dev/null --connect-timeout 1 -w "%{http_code}" \
-    "http://127.0.0.1:$PORT/_usage_proxy_health" 2>/dev/null | grep -qE '^[0-9]+$'
+    "http://127.0.0.1:$PORT/_usage_proxy_health" 2>/dev/null | grep -qE '^2[0-9][0-9]$'
 }
 
-if alive && port_responding; then
-  echo "proxy já no ar (pid $(cat "$PID_FILE"), port $PORT)"
+# Proxy já respondendo — reusa. Cobre o caso de outra instância .claude*
+# ter subido o daemon (mesmo proxy atende múltiplos envs via path prefix).
+if port_responding; then
+  if alive; then
+    echo "proxy já no ar (pid $(cat "$PID_FILE"), port $PORT)"
+  else
+    echo "proxy já no ar (compartilhado, port $PORT)"
+  fi
   exit 0
 fi
 
 # Limpa estado stale
 rm -f "$PID_FILE"
 
-# Verifica se a porta está ocupada por outro processo
+# Porta ocupada mas não é o nosso proxy (health falhou) — não sobrescreve
 if lsof -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
-  echo "erro: porta $PORT ocupada por outro processo" >&2
+  echo "erro: porta $PORT ocupada por outro processo (não é o proxy)" >&2
   echo "resolva o conflito ou use CLAUDE_USAGE_PROXY_PORT=<outra_porta>" >&2
   exit 1
 fi

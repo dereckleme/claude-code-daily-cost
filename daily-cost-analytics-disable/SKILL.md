@@ -7,13 +7,15 @@ Inverso de `/daily-cost-analytics-enable`. Deixa o Claude Code falando direto co
 
 ## Passos que o Claude vai executar
 
-0. **Resolver config dir da sessão ativa** — rode o helper e guarde em `CCD`. Todos os passos seguintes usam `$CCD`, **nunca** `~/.claude` hardcoded:
+0. **Resolver config dir da sessão ativa e LABEL** — rode o helper e guarde em `CCD`. Todos os passos seguintes usam `$CCD`, **nunca** `~/.claude` hardcoded:
    ```bash
    CCD="$(bash "$HOME/.claude/skills/daily-cost/resolve-config-dir.sh" 2>/dev/null \
          || bash "$HOME/.claude-pessoal/skills/daily-cost/resolve-config-dir.sh" 2>/dev/null \
          || echo "$HOME/.claude")"
-   echo "config dir: $CCD"
+   LABEL="$(python3 "$CCD/skills/daily-cost/session_dir.py" label 2>/dev/null || echo default)"
+   echo "config dir: $CCD  label: $LABEL"
    ```
+   Se houver outra instância `.claude*` ainda ativa compartilhando o proxy, ela vai parar de receber métricas quando você rodar esta skill. Confirme com o usuário se isso é ok antes de prosseguir.
 
 1. **Matar o proxy**:
    ```bash
@@ -21,7 +23,7 @@ Inverso de `/daily-cost-analytics-enable`. Deixa o Claude Code falando direto co
    ```
 
 2. **Remover `env.ANTHROPIC_BASE_URL`** de `$CCD/settings.json`:
-   - Se o valor apontar pra `http://127.0.0.1:*` (qualquer porta local), remova essa chave.
+   - Se o valor começar com `http://127.0.0.1:` (qualquer porta e qualquer sufixo de path, incluindo `/_env_<LABEL>`), remova essa chave.
    - Se `env` ficar vazio depois, remova o bloco `env` inteiro.
    - Se apontar pra outra coisa (Bedrock, Vertex, outro proxy externo), **não mexer** e avisar o usuário que o valor não é do daily-cost.
 
@@ -34,7 +36,7 @@ Inverso de `/daily-cost-analytics-enable`. Deixa o Claude Code falando direto co
 5. **Opcional — limpar artefatos**: se o usuário passar `limpar` como argumento, remover também:
    - `$CCD/skills/daily-cost/proxy/proxy.pid`
    - `$CCD/skills/daily-cost/proxy/proxy.log`
-   - `$CCD/skills/daily-cost/proxy/usage-state.json`
+   - `$CCD/skills/daily-cost/proxy/usage-state-$LABEL.json` (só do env atual — **não** apague o de outros envs)
 
 ## Argumentos aceitos
 
