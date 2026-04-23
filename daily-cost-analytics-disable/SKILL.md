@@ -5,38 +5,28 @@ description: Desliga o painel completo do daily-cost — mata o proxy HTTP local
 
 Inverso de `/daily-cost-analytics-enable`. Deixa o Claude Code falando direto com `api.anthropic.com` e oculta todo o painel do statusline.
 
-## Passos que o Claude vai executar
+## Como executar
 
-0. **Resolver config dir da sessão ativa** — rode o helper e guarde em `CCD`. Todos os passos seguintes usam `$CCD`, **nunca** `~/.claude` hardcoded:
-   ```bash
-   CCD="$(bash "$HOME/.claude/skills/daily-cost/resolve-config-dir.sh" 2>/dev/null \
-         || bash "$HOME/.claude-pessoal/skills/daily-cost/resolve-config-dir.sh" 2>/dev/null \
-         || echo "$HOME/.claude")"
-   echo "config dir: $CCD"
-   ```
+Resolva o config dir e rode o script Python atômico em **um único passo**:
 
-1. **Desligar segmentos** editando `$CCD/skills/daily-cost/config.json`:
-   - Setar todos os campos do bloco `segments` (`today`, `week`, `month`, `reset`, `branch`, `tpm`, `tpm_chart`, `limit`) = `false`.
-   - Com todos desligados, a statusline fica completamente vazia (nem o prefixo `$$ DAILY COST $$` é impresso).
+```bash
+CCD="$(bash "$HOME/.claude/skills/daily-cost/resolve-config-dir.sh" 2>/dev/null \
+      || bash "$HOME/.claude-pessoal/skills/daily-cost/resolve-config-dir.sh" 2>/dev/null \
+      || echo "$HOME/.claude")"
+python3 "$CCD/skills/daily-cost/disable.py" $ARGS
+```
 
-2. **Remover `env.ANTHROPIC_BASE_URL`** de `$CCD/settings.json` (penúltimo — reverte a conexão antes de parar o servidor):
-   - Se o valor apontar pra `http://127.0.0.1:*` (qualquer porta local), remova essa chave.
-   - Se `env` ficar vazio depois, remova o bloco `env` inteiro.
-   - Se apontar pra outra coisa (Bedrock, Vertex, outro proxy externo), **não mexer** e avisar o usuário que o valor não é do daily-cost.
+Onde `$ARGS` é vazio por padrão ou `limpar` se o usuário passou esse argumento.
 
-3. **Matar o proxy** (último passo — só para o servidor após tudo mais estar desligado):
-   ```bash
-   bash "$CCD/skills/daily-cost/proxy/teardown.sh"
-   ```
+O script faz tudo atomicamente e mata o proxy **5 segundos após retornar** — o proxy ainda está vivo quando o script termina, garantindo que esta sessão consiga enviar a resposta final sem erro de conexão.
 
-4. **Avisar**: "Reinicie Claude Code pra voltar a falar direto com api.anthropic.com. Até reiniciar, a sessão atual continua usando a URL anterior (proxy já parado) e vai falhar nos próximos requests."
+## O que o script faz internamente
 
-5. **Opcional — limpar artefatos**: se o usuário passar `limpar` como argumento, remover também:
-   - `$CCD/skills/daily-cost/proxy/proxy.pid`
-   - `$CCD/skills/daily-cost/proxy/proxy.session`
-   - `$CCD/skills/daily-cost/proxy/proxy.log` (symlink)
-   - `$CCD/skills/daily-cost/proxy/proxy_*.log` (todos os logs de sessões anteriores)
-   - `$CCD/skills/daily-cost/proxy/usage-state.json`
+1. Resolve o config dir ativo (mesma lógica do `resolve-config-dir.sh`).
+2. Desliga todos os segmentos em `config.json` (`today`, `week`, `month`, `reset`, `branch`, `tpm`, `tpm_chart`, `limit` → `false`).
+3. Remove `ANTHROPIC_BASE_URL` de `settings.json` (se apontar para `127.0.0.1`; se for outro destino, avisa e não mexe).
+4. Agenda o kill do proxy em background (5s de delay via subprocess `bash -c "sleep 5 && kill …"`).
+5. Se `limpar` foi passado: remove também `proxy.pid`, `proxy.session`, `proxy.log`, `proxy_*.log`, `usage-state.json`.
 
 ## Argumentos aceitos
 
@@ -45,4 +35,4 @@ Inverso de `/daily-cost-analytics-enable`. Deixa o Claude Code falando direto co
 
 ## Resposta final
 
-Uma frase curta dizendo que os segmentos foram desligados, o proxy foi parado e `settings.json` foi revertido. Reforçar o aviso de reiniciar o Claude Code.
+Mostre a saída do script (já formatada) e reforce: **"Reinicie o Claude Code para voltar a falar direto com api.anthropic.com."**
