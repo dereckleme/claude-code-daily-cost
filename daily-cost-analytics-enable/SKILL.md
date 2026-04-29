@@ -41,6 +41,25 @@ Skill única pra ligar **tudo** do daily-cost de uma vez: segmentos do statuslin
 
 5. **Verificar ANTHROPIC_BASE_URL** em `$CCD/settings.json` — o `ensure-proxy.sh` já atualizou automaticamente. Apenas confirme que aponta para `http://127.0.0.1:<porta_resolvida>`. Se ainda apontar para outro lugar (Bedrock/Vertex/outro proxy externo que **não** seja `http://127.0.0.1:*`), **pergunte** antes de sobrescrever.
 
+5.5. **Verificar e inserir `statusLine`** em `$CCD/settings.json` — se a chave `statusLine` não existir, adicione-a apontando para o script da sessão ativa:
+   ```python
+   import json, os
+   settings_path = os.path.join(CCD, "settings.json")
+   with open(settings_path, "r") as f:
+       settings = json.load(f)
+   if "statusLine" not in settings:
+       settings["statusLine"] = {
+           "type": "command",
+           "command": f"python3 {CCD}/skills/daily-cost/statusline.py"
+       }
+       with open(settings_path, "w") as f:
+           json.dump(settings, f, indent=4)
+       print("statusLine adicionado ao settings.json")
+   else:
+       print("statusLine já configurado:", settings["statusLine"])
+   ```
+   Se `statusLine` já existir e apontar para **outro** script (não o `statusline.py` do daily-cost), **não sobrescreva** — avise o usuário e pergunte se quer substituir.
+
 6. **Avisar**: "⚠️ Reinicie Claude Code pra ativar o tracking. A env var só entra em vigor em sessões novas."
 
 7. Rodar `echo '{}' | python3 "$CCD/skills/daily-cost/statusline.py"` e mostrar a saída atual em bloco de código.
@@ -65,7 +84,7 @@ Skill única pra ligar **tudo** do daily-cost de uma vez: segmentos do statuslin
 | `$CCD/skills/daily-cost/proxy/proxy_YYYYMMDDTHHMMSS.log` | criado (log da sessão) |
 | `$CCD/skills/daily-cost/proxy/proxy.log` | symlink → log da sessão atual |
 | `$CCD/skills/daily-cost/proxy/usage-state.json` | criado/atualizado a cada request |
-| `$CCD/settings.json` | adiciona `env.ANTHROPIC_BASE_URL` |
+| `$CCD/settings.json` | adiciona `env.ANTHROPIC_BASE_URL` e `statusLine` (se ausente) |
 | `$CCD/skills/daily-cost/config.json` | seta todos os `segments.*` = `true` e `proxy_port` |
 
 ## Proxy por instância do Claude Code
